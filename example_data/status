@@ -1,0 +1,12 @@
+1. UserInputProcessing - обработка пользовательского ввода
+2. Listen
+3. AssigningState
+ - 3.1 TaskConfirmation - возможность достиэения цели
+ - 3.2 UnachiveableGoalFeedBack - отклонение цели / не возможность достижения цели
+ - 3.3 IncompleteGoalFeedback -
+4. GenerateAnswer
+4. TaskResumption - возобновление задания
+5. EndPoint
+    - Forward Operator
+    - Creat Task
+    - TimeOut
