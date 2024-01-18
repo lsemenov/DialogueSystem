@@ -1,4 +1,3 @@
-
 """
 Given the intents and (correct) entities found in the user's messages,
 decides what to do/answer. This is a goal-based dialog manager.
@@ -18,7 +17,7 @@ from collections.abc import Sequence
 # 8.DP respond ANSWER_TO_USER via rest Возвращаем ответ или доп. вопрос или другйо исход.
 
 
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 
 import requests
 import time
@@ -75,6 +74,7 @@ def parse_args():
 def is_unicode(text):
     return len(text) == len(text.encode())
 
+
 class ThreadRanker(object):
     def __init__(self, paths):
         self.word_embeddings, self.embeddings_dim = load_embeddings(paths['WORD_EMBEDDINGS'])
@@ -94,10 +94,11 @@ class ThreadRanker(object):
         # HINT: you have already implemented a similar routine in the 3rd assignment.
 
         #### YOUR CODE HERE ####
-        question_vec = question_to_vec(question, self.word_embeddings, self.embeddings_dim).reshape(1 ,-1)
-        best_thread = pairwise_distances_argmin(question_vec ,thread_embeddings)
+        question_vec = question_to_vec(question, self.word_embeddings, self.embeddings_dim).reshape(1, -1)
+        best_thread = pairwise_distances_argmin(question_vec, thread_embeddings)
 
         return thread_ids[best_thread]
+
 
 class DialogueManager(object):
     def __init__(self, paths):
@@ -110,7 +111,6 @@ class DialogueManager(object):
         self.tag_classifier = unpickle_file(paths['TAG_CLASSIFIER'])
         self.action = ActionUtterance()
 
-
         # Chit-chat bot - ответ не связанный с qa knowledge based
         self.create_chitchat_bot()
 
@@ -121,7 +121,6 @@ class DialogueManager(object):
         # It could be done by creating ChatBot with the *trainer* parameter equals
         # "chatterbot.trainers.ChatterBotCorpusTrainer"
         # and then calling *train* function with "chatterbot.corpus.english" param
-
 
         self.chitchat_bot = ChatBot('Ron Obvious')
 
@@ -159,6 +158,21 @@ class DialogueManager(object):
 
 
 class Dialogue(abc.ABC):
+
+
+    slot = {"intent": [
+        {
+            "question": "",
+            "action": ""
+        }
+    ],
+        "history": [],
+        "status": "",
+        "limit": 2,
+        "embeddings": [],
+        "user_id": []
+    }
+
     """
     Объект диалога принимает высказывания, выполняет их парсинг
     и интерпретацию, а затем изменяет внутреннее состояние. После этого
@@ -182,17 +196,16 @@ class Dialogue(abc.ABC):
         sents = self.parse(text)
 
         # интерпретация
-        sents, confidence, intent, kwarg = self.interpret(sents, **kwargs)
+        sents, confidence, kwarg = self.interpret(sents, **kwargs)
 
         # определение ответа
         if response:
-            reply = self.respond(sents, confidence, intent, **kwargs)
+            reply = self.respond(sents, confidence, **kwargs)
         else:
             reply = None
 
         # передача инициативы
         return reply, confidence
-
 
     #
     @abc.abstractmethod
@@ -207,7 +220,6 @@ class Dialogue(abc.ABC):
 
         return []
 
-
     @abc.abstractmethod
     async def interpret(self, sents, **kwargs):
         """
@@ -221,8 +233,7 @@ class Dialogue(abc.ABC):
         :return:
         """
 
-        return sents, 0.0, 0, kwargs
-
+        return sents, 0.0, kwargs
 
     @abc.abstractmethod
     def respond(self, sents, confidence, **kwargs):
@@ -249,8 +260,10 @@ class SimpleConversation(Dialogue, Sequence):
     Этот класс также наследует класс collections.abc.Sequence из стандартной библиотеки, который позволит классу SimpleConversation
     действовать подобно индексируемому списку диалогов (благодаря абстрактному методу __getitem__) и получать количество диалогов в коллекции (методом __len__):
     """
-    def __init__(self, dialogs):
+
+    def __init__(self, dialogs, slot):
         self._dialogs = dialogs
+        self.slot = slot
 
     def __getitem__(self, idx):
         return self._dialogs[idx]
@@ -258,26 +271,25 @@ class SimpleConversation(Dialogue, Sequence):
     def __len__(self):
         return len(self._dialogs)
 
-    def listen(self, text, response=True, **kwargs):
-        """
-        Просто возвращает ответ с лучшей оценкой достоверности
-        :param text:
-        :param response:
-        :param kwargs:
-        :return:
-        Передадим входной текст методам listen всех внутренних экземпляров Dialog,
-        которые, в свою очередь, вызовут внутренние методы parse, interpret и respond
-        """
-
-        responses = [
-            dialog.listen(text, response, **kwargs)
-            for dialog in self._dialogs
-        ]
-
-        # responses - список кортежей (reply, confidence)
-
-        return max(responses, key=itemgetter(1))
-
+    # def listen(self, text, response=True, **kwargs):
+    #     """
+    #     Просто возвращает ответ с лучшей оценкой достоверности
+    #     :param text:
+    #     :param response:
+    #     :param kwargs:
+    #     :return:
+    #     Передадим входной текст методам listen всех внутренних экземпляров Dialog,
+    #     которые, в свою очередь, вызовут внутренние методы parse, interpret и respond
+    #     """
+    #
+    #     responses = [
+    #         dialog.listen(text, response, **kwargs)
+    #         for dialog in self._dialogs
+    #     ]
+    #
+    #     # responses - список кортежей (reply, confidence)
+    #
+    #     return max(responses, key=itemgetter(1))
 
     def parse(self, text):
         """
@@ -296,64 +308,160 @@ class SimpleConversation(Dialogue, Sequence):
         return text
 
 
-    async def discussion_classifier(self, query: str, prompt=domain_classifier_prompt) -> int:
-        """
-        Классификация вопроса пользователя, имеется ли проблема
-        """
-        logging.info(f"сработала функция discussion_classifier")
-        # ONLY FOR TEST !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ЗАГЛУШКА
-        # return 1
-        llm_chain = LLMChain(
-            llm=OpenAI(
-                temperature=0,
-                # model_name="gpt-4",
-                model_name="gpt-3.5-turbo-instruct",
-                max_tokens=1,
-                openai_api_key=openai.api_key,
-                request_timeout=600,
-                max_retries=3
-            ),
-            prompt=prompt,
-        )
-
-        try:
-            # Является ли реплика запросом на консултацию или тезхническим вопросом.
-            label = await llm_chain.arun(text=query)
-
-        except Exception as e:
-            logging.error(f"функция discussion_classifier вызвала ошибку: {e}")
-            label = "F"
-
-        # проверяем класс
-        if "T" in label:
-            label = 1
-
-        else:
-            label = 0
-
-        logging.info(f"резлуьтат работы функции discussion_classifier для {query} : {label}")
-        return label
-
-
     def interept(self, sents: str, **kwargs):
         """
         Возвращает все результаты интерпретации, полученные внутренними
-        диалогами, для отладки
+        диалогами, для отладки.
         Также добавим поддержку оценки достоверности, чтобы можно было вести беседу согласно уверенности
-        в достоверности интерпретации входного текста.
+        в достоверности интерпретации входного текста. Принимает данные и определяет действие для выполнения:
+        ответ на вопрос в доменной области, ответ общий в доменной области, отказ.
         :param sents:
         :param kwargs:
         :return:
         """
+        # если диалог не технический и без проблемы
 
         if len(sents) == 0:
-            return sents, 0.0, kwargs
+            action = "endpoint"
+
 
         intent, confidence = await self.intent_classification(sents)
 
+
+        # если вопрос по доменной области
+        if intent == 1 and confidence > 0.5:
+            action = "qa_response"
+
+
+        # если воопрос на предостовления информации общего характера в доменной области
+        elif intent == 2 and confidence >0.5:
+            action = "answer"
+
+
+        # если задается вопрос о проблеме и технической неполадке не в доменной области илм просьба что то сделать не в рамках полномочий
+        elif intent == 3 and confidence > 0.5:
+            action = "forward" # передаресовать операторам
+            action2 = "reject" # задать доп. вопрос
+            action3 = "endpoint" # закончить диалог
+
+        # информирование о том что то сделано или обсуждаются ощие вопросы с другиими пользователями
+        elif intent == 4 and confidence > 0.5:
+            action = "listen"
+
+
+        # #  выражение согласия
+        # elif intent == 5 and confidence > 0.5:
+        #     action = "listen"
+        #
+        #
+        # # выражение не согласия
+        # elif intent == 6 and confidence > 0.5:
+        #     action = "listen"
+
+        # прощание и выражение благодарности заканчивание диалога
+        elif intent == 7 and confidence > 0.5:
+            action = "endpoint"
+
+        else:
+            action = "listen"
+
+
         # return [dialog.interept(sents, **kwargs) for dialog in self._dialogs]
 
-        return sents, intent, confidence
+        return sents, action, confidence
+
+
+
+    def respond(self, sents, action, confidence, **kwargs):
+        """
+        Возвращает все ответы, созданные внутренними диалогами, для отладки
+        :param sents:
+        :param confidence:
+        :param kwargs:
+        :return:
+        """
+
+        if confidence == 0:
+            return None
+
+
+        if action == "qa_response" and self.slot["limit"] > 0:
+
+            history = self.slot["history"]
+            self.slot["status"] = "genarate_answer"
+            self.slot["limit"] -= 1
+            response = await self.qa_retriever(sents)
+
+        if action == "answer" and self.slot["limit"] > 0:
+
+            history = self.slot["history"]
+            self.slot["status"] = "generate_answer"
+            self.slot["limit"] -= 1
+
+            # !!! ПОМЕНЯТЬ НА COOMON PROMPT
+            response = await self.qa_retriever(sents)
+
+        if action == "listen":
+            self.slot["status"] = "listen"
+            return None
+
+        if action == "endpoint":
+            self.slot["status"] = "endpoint"
+            response = "Я не знаю ответа, обратитесь в поддержке"
+
+
+        if action == "forward":
+
+            response = "Вопрос отправлен оператору ждите"
+
+
+        return response
+
+        # return [
+        #     dialog.respond(sents, confidence, **kwargs)
+        #     for dialog in self._dialogs
+        # ]
+
+    async def qa_retriever(self, question: str, history:list = None) -> str:
+
+        if history is None:
+            history = [[], []]
+
+        query = ",".join(history[0][-5:][::-1])
+        query = question + query
+        "ответ на вопрос на оснвое контекста отдельно"
+        llm = ChatOpenAI(
+            model_name="gpt-4-1106-preview",
+            # model_name="gpt-4",
+            # model_name="gpt-3.5-turbo-16k",
+            openai_api_key=openai.api_key,
+            max_tokens=1200,
+            temperature=0)
+
+        query = question
+
+        # load vector store
+        db = FAISS.load_local("model/faiss_index", embeddings)
+
+        # Init your retriever. Asking for just 4 document back
+        retriever = db.as_retriever(search_kwarg={"k": 5})
+
+        qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
+        # chain = load_qa_chain(llm, chain_type="stuff", prompt=QA_CHAIN_PROMPT)
+        try:
+            # ans = chain({"input_documents": docs[:5], "question": question}, return_only_outputs=True)
+            ans = await qa.arun(question)
+            logging.info(
+                f" user_id = 666 ;;; рузультат qa retriever: {ans}")  # user_id = 1 означает что бот запущен
+            # ans = ans["output_text"]
+
+        except Exception as e:
+            logging.error(
+                f" user_id = 666 ;;; ошибка: {e} в работе модели", exc_info=True
+            )
+            ans = text
+
+        return ans
 
 
     async def intent_classification(self, query: str, prompt=prompt):
@@ -393,55 +501,62 @@ class SimpleConversation(Dialogue, Sequence):
 
         return label
 
-    def respond(self, sents, confidence, intent, **kwargs):
+    async def discussion_classifier(self, query: str, prompt=domain_classifier_prompt) -> int:
         """
-        Возвращает все ответы, созданные внутренними диалогами, для отладки
-        :param sents:
-        :param confidence:
-        :param kwargs:
-        :return:
+        Классификация вопроса пользователя, имеется ли проблема
         """
+        logging.info(f"сработала функция discussion_classifier")
+        # ONLY FOR TEST !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ЗАГЛУШКА
+        # return 1
+        llm_chain = LLMChain(
+            llm=OpenAI(
+                temperature=0,
+                # model_name="gpt-4",
+                model_name="gpt-3.5-turbo-instruct",
+                max_tokens=1,
+                openai_api_key=openai.api_key,
+                request_timeout=600,
+                max_retries=3
+            ),
+            prompt=prompt,
+        )
 
-        if intent == 1 and confidence >0.5:
-            qa_response = await self.qa_retriever(retriever, sents)
-            return qa_response
-
-
-
-
-        return [
-            dialog.respond(sents, confidence, ** kwargs)
-            for dialog in self._dialogs
-        ]
-
-
-    async def qa_retriever(self, retriever, question: str, text) -> str:
-        "ответ на вопрос на оснвое контекста отдельно"
-        llm = ChatOpenAI(
-            model_name="gpt-4-1106-preview",
-            # model_name="gpt-4",
-            # model_name="gpt-3.5-turbo-16k",
-            openai_api_key=openai.api_key,
-            max_tokens=1200,
-            temperature=0)
-
-        qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
-        # chain = load_qa_chain(llm, chain_type="stuff", prompt=QA_CHAIN_PROMPT)
         try:
-            # ans = chain({"input_documents": docs[:5], "question": question}, return_only_outputs=True)
-            ans = await qa.arun(question)
-            logging.info(
-                f" user_id = 666 ;;; рузультат qa retriever: {ans}")  # user_id = 1 означает что бот запущен
-            # ans = ans["output_text"]
+            # Является ли реплика запросом на консултацию или тезхническим вопросом.
+            label = await llm_chain.arun(text=query)
 
         except Exception as e:
-            logging.error(
-                f" user_id = 666 ;;; ошибка: {e} в работе модели", exc_info=True
-            )
-            ans = text
+            logging.error(f"функция discussion_classifier вызвала ошибку: {e}")
+            label = "F"
 
-        return ans
+        # проверяем класс
+        if "T" in label:
+            label = 1
 
+        else:
+            label = 0
 
+        logging.info(f"резлуьтат работы функции discussion_classifier для {query} : {label}")
+        return label
 
+slot = {"intent": [
+    {
+        "question": "",
+        "action": ""
+    }
+],
+    "history": [],
+    "status": "",
+    "limit": 2,
+    "embeddings": [],
+    "user_id": [1, 2, 3, 4]}
+
+if __name__ == "__main__":
+    dialog = SimpleConversation()
+    # listen возвращает кортежи (reply, confidence) мы прсото выводим ответа
+    print(dialog.listen("Приветю проблема с госэдо")[0])
+    print(dialog.listen("Имею проблему отправки дублированныц пакетов дсп")[0])
+    print(dialog.listen("Спасибо всё гуд")[0])
+    print(dialog.listen("Я сделал то-то а получил тете")[0])
+    print(dialog.listen("Какой породы ретривер")[0])
 

@@ -25,6 +25,18 @@ domain:
     user_id - пользователь который задал вопрос, для реплай и отслеживания его диалога
 
 
+slot = {"intent": [
+            {
+              "question": "",
+              "action": ""
+            }
+        ],
+         "history": [],
+         "status": "",
+         "limit": 2,
+         "embeddings":[],
+         "user_id": [1,2,3,4]}
+
 
 production_line:
   summary: "production line"

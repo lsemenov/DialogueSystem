@@ -61,6 +61,22 @@ AskTechDomain
 ///
 """
 
+
+# evaluate result
+template_evaluate = """
+    {
+        "role": "system",
+        "content": "You are a helpful expert financial research assistant. You help users analyze financial statements to better understand companies. "
+        "For the given query, evaluate whether the following satement is relevant."
+        "Output only 'yes' or 'no'."
+    },
+    {
+        "role": "user",
+        "content": f"Query: {query}, Statement: {statement}"
+    }
+"""
+
+
 template_for_help_rus = """
 Для решения проблемы действуй по алгоритму шаг за шагом:
 Для следующего текста, ограниченного символом ///, извлеките следующую информацию:
